@@ -29,17 +29,6 @@ Installation and Platform Consistency
 * A README.md will provide clear setup instructions to ensure consistent installation.
 Artifact: Real-Time Research Assistant App
 
-index.html
-html
-Show inline
-
-server.js
-javascript
-Show inline
-
-README.md
-markdown
-Show inline
 Explanation of Functionality
 * Frontend (index.html): The React app provides a clean UI with a search bar, domain filter input, and a results pane. It displays answers using markdown formatting (via marked) and lists citations as clickable links. Recent queries are stored in state for quick access.
 * Backend (server.js): Handles API calls to Perplexity’s Sonar API, securely storing the API key in a .env file. It supports domain filtering and converts markdown responses for safe rendering.
@@ -56,3 +45,187 @@ The app mirrors the functionality of a research tool like Perplexity’s interfa
 * Citations: Inline citations enhance trust and accuracy, as emphasized in Perplexity’s use cases (e.g., Doximity for medical research).
 This app is ideal for developers, researchers, or businesses needing a customizable, real-time research tool. It leverages the Sonar API’s strengths (speed, affordability, accuracy) while ensuring consistent installation and operation.
 
+front end code <!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Real-Time Research Assistant</title>
+  <script src="https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.development.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.development.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.23.6/babel.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/axios@1.6.2/dist/axios.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked@4.0.12/marked.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    const App = () => {
+      const [query, setQuery] = useState('');
+      const [domain, setDomain] = useState('');
+      const [answer, setAnswer] = useState('');
+      const [citations, setCitations] = useState([]);
+      const [recentQueries, setRecentQueries] = useState([]);
+      const [loading, setLoading] = useState(false);
+      const [error, setError] = useState('');
+
+      const fetchAnswer = async () => {
+        if (!query.trim()) return;
+        setLoading(true);
+        setError('');
+        try {
+          const response = await axios.post('/api/search', { query, domain });
+          const { answer, citations } = response.data;
+          setAnswer(answer);
+          setCitations(citations || []);
+          setRecentQueries(prev => {
+            const updated = [query, ...prev.filter(q => q !== query)].slice(0, 5);
+            return updated;
+          });
+        } catch (err) {
+          setError('Failed to fetch answer. Please try again.');
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        fetchAnswer();
+      };
+
+      const handleRecentQueryClick = (recentQuery) => {
+        setQuery(recentQuery);
+        fetchAnswer();
+      };
+
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-blue-900 text-white flex">
+          <div className="w-1/4 p-6 border-r border-blue-500/30">
+            <h2 className="text-xl font-bold mb-4 text-blue-300">Recent Queries</h2>
+            <ul className="space-y-2">
+              {recentQueries.map((q, index) => (
+                <li
+                  key={index}
+                  onClick={() => handleRecentQueryClick(q)}
+                  className="p-2 bg-blue-800/50 rounded-lg hover:bg-blue-700/70 cursor-pointer transition-all duration-300"
+                >
+                  {q}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="w-3/4 p-8 flex flex-col items-center">
+            <h1 className="text-4xl font-extrabold mb-8 text-blue-200 drop-shadow-lg">
+              Real-Time Research Assistant
+            </h1>
+            <form onSubmit={handleSubmit} className="w-full max-w-2xl mb-6">
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Ask a question..."
+                className="w-full p-4 rounded-lg bg-blue-800/50 border border-blue-500/50 text-white placeholder-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all duration-300"
+              />
+              <input
+                type="text"
+                value={domain}
+                onChange={(e) => setDomain(e.target.value)}
+                placeholder="Filter by domain (e.g., .edu)"
+                className="w-full mt-4 p-4 rounded-lg bg-blue-800/50 border border-blue-500/50 text-white placeholder-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all duration-300"
+              />
+              <button
+                type="submit"
+                disabled={loading}
+                className="mt-4 w-full p-4 bg-blue-600 rounded-lg hover:bg-blue-500 disabled:bg-blue-400 transition-all duration-300"
+              >
+                {loading ? 'Searching...' : 'Search'}
+              </button>
+            </form>
+            {error && <p className="text-red-400 mb-4">{error}</p>}
+            {answer && (
+              <div className="w-full max-w-2xl p-6 bg-blue-800/30 rounded-lg shadow-lg">
+                <div
+                  className="prose prose-invert max-w-none"
+                  dangerouslySetInnerHTML={{ __html: marked.parse(answer) }}
+                />
+                {citations.length > 0 && (
+                  <div className="mt-4">
+                    <h3 className="text-lg font-semibold text-blue-300">Citations:</h3>
+                    <ul className="list-disc pl-5">
+                      {citations.map((citation, index) => (
+                        <li key={index}>
+                          <a
+                            href={citation.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-400 hover:underline"
+                          >
+                            {citation.title || citation.url}
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    };
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
+
+back end codeconst express = require('express');
+const axios = require('axios');
+const cors = require('cors');
+const dotenv = require('dotenv');
+
+dotenv.config();
+const app = express();
+
+app.use(cors());
+app.use(express.json());
+
+app.post('/api/search', async (req, res) => {
+  const { query, domain } = req.body;
+
+  if (!query) {
+    return res.status(400).json({ error: 'Query is required' });
+  }
+
+  try {
+    const response = await axios.post(
+      'https://api.perplexity.ai/sonar/search',
+      {
+        query,
+        domain_filter: domain ? [domain] : undefined,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.PERPLEXITY_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    const { answer, citations } = response.data;
+    res.json({ answer, citations });
+  } catch (error) {
+    console.error('Error fetching from Perplexity API:', error.message);
+    res.status(500).json({ error: 'Failed to fetch answer' });
+  }
+});
+
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
